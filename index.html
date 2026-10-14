@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RIFAT PRO TRADING BOT (PWA)</title>
+  <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlJJRkFUIFBSTyBUUkFESU5HIEJPVCIsCiAgInNob3J0X25hbWUiIjogIlJJRkFUIEJPVCIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjMGIwZjE5IiwKICAidGhlbWVfY29sb3IiOiAiIzBiMGYxOSIKfQ==">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #151c2c;
+      --accent: #00e676;
+      --danger: #ff5252;
+      --text: #ffffff;
+      --subtext: #8b9bb4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 15px; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 480px; }
+    .card { background: var(--card); border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    h2, h3 { text-align: center; margin-bottom: 15px; color: var(--accent); }
+    input, select, button { width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #2a374e; background: #0b0f19; color: #fff; font-size: 14px; }
+    button { background: var(--accent); color: #000; font-weight: bold; border: none; cursor: pointer; transition: 0.2s; }
+    button:active { transform: scale(0.98); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .hidden { display: none; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .stat-box { background: #0b0f19; padding: 10px; border-radius: 8px; text-align: center; }
+    .stat-box span { display: block; font-size: 12px; color: var(--subtext); }
+    .stat-box strong { font-size: 16px; color: var(--accent); }
+    .timer { font-size: 28px; text-align: center; font-weight: bold; margin: 10px 0; color: #ffeb3b; }
+    .signal { font-size: 22px; text-align: center; font-weight: bold; padding: 10px; border-radius: 8px; margin-top: 10px; }
+    .call { background: rgba(0, 230, 118, 0.2); color: var(--accent); border: 1fr solid var(--accent); }
+    .put { background: rgba(255, 82, 82, 0.2); color: var(--danger); border: 1fr solid var(--danger); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- LOGIN GATE -->
+  <div id="login-card" class="card">
+    <h2>🔐 Login Gate</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <p id="login-err" style="color:var(--danger); text-align:center; font-size:12px;"></p>
+  </div>
+
+  <!-- MAIN DASHBOARD -->
+  <div id="app-card" class="card hidden">
+    <h2>🚀 RIFAT TRADING BOT</h2>
+    
+    <!-- Broker Select -->
+    <label>Select Broker:</label>
+    <select id="broker" onchange="loadBrokerData()">
+      <option value="quotex">Quotex</option>
+      <option value="pocket">Pocket Option</option>
+    </select>
+
+    <!-- Capital Setup -->
+    <div class="stats-grid">
+      <div>
+        <label>Capital (BDT):</label>
+        <input type="number" id="capital" value="10000" onchange="updateCalc()">
+      </div>
+      <div>
+        <label>Account ID:</label>
+        <input type="text" id="acc-id" value="USER-01" onchange="loadBrokerData()">
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div>
+        <label>Target Profit (%):</label>
+        <input type="number" id="tp-pct" value="10" onchange="updateCalc()">
+      </div>
+      <div>
+        <label>Stop Loss (%):</label>
+        <input type="number" id="sl-pct" value="5" onchange="updateCalc()">
+      </div>
+    </div>
+
+    <!-- Calculations View -->
+    <div class="stats-grid">
+      <div class="stat-box">
+        <span>Target Profit Amount</span>
+        <strong id="tp-amt">৳1,000</strong>
+      </div>
+      <div class="stat-box">
+        <span>Stop Loss Amount</span>
+        <strong id="sl-amt" style="color:var(--danger)">৳500</strong>
+      </div>
+    </div>
+
+    <hr style="border-color:#2a374e; margin:15px 0;">
+
+    <!-- Signals & Timer -->
+    <button onclick="startSignalEngine()">📡 Generate Next 1M Signal</button>
+    
+    <div class="timer" id="timer-display">00:60</div>
+    <div id="signal-display" class="signal hidden">--</div>
+
+    <hr style="border-color:#2a374e; margin:15px 0;">
+
+    <!-- Trade Logging -->
+    <h3>📝 Log Trade Result</h3>
+    <select id="trade-reason">
+      <option value="Trend Follow">Trend Follow</option>
+      <option value="S/R Reversal">S/R Reversal</option>
+      <option value="Breakout">Breakout</option>
+      <option value="OTC Pattern">OTC Pattern</option>
+    </select>
+    <div class="stats-grid">
+      <button onclick="logTrade('WIN')">✅ WIN</button>
+      <button class="btn-danger" onclick="logTrade('LOSS')">❌ LOSS</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Login Check
+  function login() {
+    const u = document.getElementById('username').value;
+    const p = document.getElementById('password').value;
+    if (u === 'Rifat' && p === 'Rifat2026') {
+      document.getElementById('login-card').classList.add('hidden');
+      document.getElementById('app-card').classList.remove('hidden');
+      loadBrokerData();
+    } else {
+      document.getElementById('login-err').innerText = 'Invalid Username or Password!';
+    }
+  }
+
+  // Voice Alert
+  function speak(text) {
+    if ('speechSynthesis' in window) {
+      const msg = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(msg);
+    }
+  }
+
+  // Capital & TP/SL Calculation
+  function updateCalc() {
+    const cap = parseFloat(document.getElementById('capital').value) || 0;
+    const tpPct = parseFloat(document.getElementById('tp-pct').value) || 0;
+    const slPct = parseFloat(document.getElementById('sl-pct').value) || 0;
+
+    const tpAmt = (cap * tpPct) / 100;
+    const slAmt = (cap * slPct) / 100;
+
+    document.getElementById('tp-amt').innerText = '৳' + tpAmt.toLocaleString();
+    document.getElementById('sl-amt').innerText = '৳' + slAmt.toLocaleString();
+    
+    saveBrokerData();
+  }
+
+  // LocalStorage Lock per Broker & Account
+  function getStorageKey() {
+    const broker = document.getElementById('broker').value;
+    const accId = document.getElementById('acc-id').value;
+    return `trader_${broker}_${accId}`;
+  }
+
+  function saveBrokerData() {
+    const data = {
+      capital: document.getElementById('capital').value,
+      tpPct: document.getElementById('tp-pct').value,
+      slPct: document.getElementById('sl-pct').value,
+    };
+    localStorage.setItem(getStorageKey(), JSON.stringify(data));
+  }
+
+  function loadBrokerData() {
+    const data = JSON.parse(localStorage.getItem(getStorageKey()));
+    if (data) {
+      document.getElementById('capital').value = data.capital || 10000;
+      document.getElementById('tp-pct').value = data.tpPct || 10;
+      document.getElementById('sl-pct').value = data.slPct || 5;
+    }
+    updateCalc();
+  }
+
+  // Signal Engine & 10s Warning
+  let timerInterval = null;
+  function startSignalEngine() {
+    clearInterval(timerInterval);
+    const directions = ['CALL (UP)', 'PUT (DOWN)'];
+    const selected = directions[Math.floor(Math.random() * directions.length)];
+    
+    const sigDisp = document.getElementById('signal-display');
+    sigDisp.classList.remove('hidden', 'call', 'put');
+    if(selected.includes('CALL')) {
+      sigDisp.classList.add('call');
+    } else {
+      sigDisp.classList.add('put');
+    }
+    sigDisp.innerText = 'SIGNAL: ' + selected;
+    speak('New signal: ' + selected);
+
+    let timeLeft = 60;
+    const timerDisp = document.getElementById('timer-display');
+    
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      timerDisp.innerText = '00:' + (timeLeft < 10 ? '0' : '') + timeLeft;
+      
+      if (timeLeft === 10) {
+        speak('Warning! 10 seconds remaining for next candle');
+      }
+
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        timerDisp.innerText = '00:00';
+        speak('Candle expired');
+      }
+    }, 1000);
+  }
+
+  // Log Trade Result
+  function logTrade(result) {
+    const reason = document.getElementById('trade-reason').value;
+    speak(`Trade logged as ${result} due to ${reason}`);
+    alert(`Trade recorded: ${result} [Reason: ${reason}]`);
+  }
+</script>
+
+</body>
+</html>
